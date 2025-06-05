@@ -1,16 +1,27 @@
 use strsim::levenshtein;
 
 pub fn suggest_command<'a>(failed: &'a str, history: &'a [String]) -> Option<&'a String> {
-    history
-        .iter()
-        .filter(|cmd| similarity(failed, cmd) > 0.50)
-        .max_by(|a, b| {
-            let sim_a = similarity(failed, a);
-            let sim_b = similarity(failed, b);
-            sim_a
-                .partial_cmp(&sim_b)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
+    let mut best: Option<(&String, f64)> = None;
+
+    for cmd in history {
+        let sim = similarity(failed, cmd);
+        eprintln!("Comparing: '{}' <-> '{}' : {:.4}", failed, cmd, sim);
+        if sim >= 0.5 {
+            match best {
+                Some((_, best_sim)) if sim > best_sim => best = Some((cmd, sim)),
+                None => best = Some((cmd, sim)),
+                _ => {}
+            }
+        }
+    }
+
+    if let Some((approved, score)) = &best {
+        eprintln!("Approved suggestion: '{}' (score: {:.4})", approved, score);
+        Some(approved)
+    } else {
+        eprintln!("No command in history reached the similarity threshold (0.95).");
+        None
+    }
 }
 
 pub fn similarity(a: &str, b: &str) -> f64 {
