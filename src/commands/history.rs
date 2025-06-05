@@ -1,4 +1,4 @@
-use crate::{help, read_history};
+use crate::{utilities, read_history};
 use std::process;
 
 pub fn list_history(path: &str) {
@@ -14,17 +14,16 @@ pub fn list_history(path: &str) {
 
 pub fn clear_history(path: &str) {
     if let Err(e) = std::fs::write(&path, "") {
-        help::print_error(&format!("Could not clear history: {}", e));
+        utilities::print_error(&format!("Could not clear history: {}", e));
         process::exit(1);
     }
     println!("History cleared.");
     return;
 }
 
-pub fn remove_command(path: &str, command: &str) {
+pub fn remove_command(path: &str, _command: &str) {
     let command_list = std::fs::read_to_string(&path);
     if command_list.is_err() {
-        help::print_error(&"Could not delete the command from the history".to_string());
+        utilities::print_error(&"Could not delete the command from the history".to_string());
     }
-    
 }

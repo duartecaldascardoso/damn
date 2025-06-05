@@ -1,11 +1,10 @@
-mod help;
 mod commands;
 
+use crate::commands::{history, metrics, utilities};
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::process;
 use strsim::levenshtein;
-use crate::commands::history;
 
 fn read_history(path: &str) -> Vec<String> {
     let file = match File::open(path) {
@@ -33,7 +32,9 @@ fn suggest_command<'a>(failed: &'a str, history: &'a [String]) -> Option<&'a Str
         .max_by(|a, b| {
             let sim_a = similarity(failed, a);
             let sim_b = similarity(failed, b);
-            sim_a.partial_cmp(&sim_b).unwrap_or(std::cmp::Ordering::Equal)
+            sim_a
+                .partial_cmp(&sim_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
 }
 
@@ -42,25 +43,25 @@ fn main() {
     let home = match std::env::var("HOME") {
         Ok(val) => val,
         Err(_) => {
-            help::print_error("Could not determine HOME directory.");
+            utilities::print_error("Could not determine HOME directory.");
             process::exit(1);
         }
     };
     let history_path = format!("{}/.damn_history", home);
 
     if args.len() <= 1 {
-        help::print_help();
+        utilities::print_help();
         return;
     }
 
     // Handle flags before subcommands
     match args[1].as_str() {
         "--help" | "-h" | "help" => {
-            help::print_help();
+            utilities::print_help();
             return;
         }
         "--version" | "-V" => {
-            help::print_version();
+            utilities::print_version();
             return;
         }
         _ => {}
@@ -75,23 +76,30 @@ fn main() {
         }
         "add" => {
             if let Some(name) = args.get(2) {
-                let mut file = match OpenOptions::new().append(true).create(true).open(&history_path) {
+                let mut file = match OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(&history_path)
+                {
                     Ok(f) => f,
                     Err(e) => {
-                        help::print_error(&format!("Could not open history file: {}", e));
+                        utilities::print_error(&format!("Could not open history file: {}", e));
                         process::exit(1);
                     }
                 };
                 if let Err(e) = writeln!(file, "{}", name) {
-                    help::print_error(&format!("Could not write to history file: {}", e));
+                    utilities::print_error(&format!("Could not write to history file: {}", e));
                     process::exit(1);
                 }
                 println!("Added: {}", name);
             } else {
-                help::print_error("No command provided to add.");
+                utilities::print_error("No command provided to add.");
                 process::exit(1);
             }
             return;
+        }
+        "metrics" => {
+            metrics::usage_metrics(&history_path);
         }
         "remove" => {
             history::remove_command(&history_path, args.get(2).unwrap());
