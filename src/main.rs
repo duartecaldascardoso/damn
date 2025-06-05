@@ -1,13 +1,13 @@
 mod commands;
 mod suggestions;
 
+use crate::suggestions::similarity_suggest::suggest_command;
 use clap::Subcommand;
 use clap::{CommandFactory, Parser};
 use commands::{history, metrics, user_creation, utilities};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::process;
-use crate::suggestions::similarity_suggest::suggest_command;
 
 #[derive(Parser)]
 #[command(
@@ -30,6 +30,7 @@ enum Commands {
     List,
     Clear,
     Metrics,
+    Debug { command: String },
 }
 
 fn read_history(path: &str) -> Vec<String> {
@@ -64,13 +65,22 @@ fn main() {
             user_creation::add_command(&history_path, name);
         }
         Some(Commands::Danger { name }) => {
-            user_creation::add_dangerous_command(&history_path,name);
+            user_creation::add_dangerous_command(&history_path, name);
         }
         Some(Commands::Remove { name }) => {
             history::remove_command(&history_path, name);
         }
         Some(Commands::Metrics) => {
             metrics::usage_metrics(&history_path);
+        }
+        Some(Commands::Debug { command }) => {
+            let history = read_history(&history_path);
+            if let Some(suggestion) = suggest_command(&command, &history) {
+                println!("Best match: {}", suggestion);
+            } else {
+                println!("No similar command found in history.");
+                std::process::exit(1);
+            }
         }
         None => {
             if !cli.failed_command.is_empty() {
