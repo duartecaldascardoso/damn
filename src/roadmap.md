@@ -20,3 +20,10 @@ Ideas:
   - Commands that were mistakenly input the most
   - Saved time metric while using Damn (based on estimated input time per word)
 
+## TODO
+
+- Fix the existing logic for saving success commands
+- Find the correct ration for string similarity
+- Improve logic to change similarity threshold according to failed command length
+- Create a way to automate the content sent to .zshrc and .bashrc
+- Improve refresh.sh to actually refresh the .zshrc and .bashrc configuration files
