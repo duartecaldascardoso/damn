@@ -1,10 +1,36 @@
 mod commands;
+mod suggestions;
 
-use crate::commands::{history, metrics, utilities};
-use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use clap::Subcommand;
+use clap::{CommandFactory, Parser};
+use commands::{history, metrics, user_creation, utilities};
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::process;
-use strsim::levenshtein;
+use crate::suggestions::similarity_suggest::suggest_command;
+
+#[derive(Parser)]
+#[command(
+    name = "damn",
+    version,
+    about = "Your shell’s undo button: auto-suggest and rerun the right command based on your own shell history."
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+    #[arg(trailing_var_arg = true)]
+    failed_command: Vec<String>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Add { name: String },
+    Danger { name: String },
+    Remove { name: String },
+    List,
+    Clear,
+    Metrics,
+}
 
 fn read_history(path: &str) -> Vec<String> {
     let file = match File::open(path) {
@@ -15,31 +41,9 @@ fn read_history(path: &str) -> Vec<String> {
     reader.lines().filter_map(Result::ok).collect()
 }
 
-fn similarity(a: &str, b: &str) -> f64 {
-    let dist = levenshtein(a, b) as f64;
-    let max_len = a.len().max(b.len()) as f64;
-    if max_len == 0.0 {
-        1.0
-    } else {
-        1.0 - (dist / max_len)
-    }
-}
-
-fn suggest_command<'a>(failed: &'a str, history: &'a [String]) -> Option<&'a String> {
-    history
-        .iter()
-        .filter(|cmd| similarity(failed, cmd) > 0.99)
-        .max_by(|a, b| {
-            let sim_a = similarity(failed, a);
-            let sim_b = similarity(failed, b);
-            sim_a
-                .partial_cmp(&sim_b)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
-}
-
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let cli = Cli::parse();
+
     let home = match std::env::var("HOME") {
         Ok(val) => val,
         Err(_) => {
@@ -49,68 +53,38 @@ fn main() {
     };
     let history_path = format!("{}/.damn_history", home);
 
-    if args.len() <= 1 {
-        utilities::print_help();
-        return;
-    }
-
-    // Handle flags before subcommands
-    match args[1].as_str() {
-        "--help" | "-h" | "help" => {
-            utilities::print_help();
-            return;
-        }
-        "--version" | "-V" => {
-            utilities::print_version();
-            return;
-        }
-        _ => {}
-    }
-
-    match args[1].as_str() {
-        "list" => {
+    match &cli.command {
+        Some(Commands::List) => {
             history::list_history(&history_path);
         }
-        "clear" => {
+        Some(Commands::Clear) => {
             history::clear_history(&history_path);
         }
-        "add" => {
-            if let Some(name) = args.get(2) {
-                let mut file = match OpenOptions::new()
-                    .append(true)
-                    .create(true)
-                    .open(&history_path)
-                {
-                    Ok(f) => f,
-                    Err(e) => {
-                        utilities::print_error(&format!("Could not open history file: {}", e));
-                        process::exit(1);
-                    }
-                };
-                if let Err(e) = writeln!(file, "{}", name) {
-                    utilities::print_error(&format!("Could not write to history file: {}", e));
-                    process::exit(1);
-                }
-                println!("Added: {}", name);
-            } else {
-                utilities::print_error("No command provided to add.");
-                process::exit(1);
-            }
-            return;
+        Some(Commands::Add { name }) => {
+            user_creation::add_command(&history_path, name);
         }
-        "metrics" => {
+        Some(Commands::Danger { name }) => {
+            user_creation::add_dangerous_command(&history_path,name);
+        }
+        Some(Commands::Remove { name }) => {
+            history::remove_command(&history_path, name);
+        }
+        Some(Commands::Metrics) => {
             metrics::usage_metrics(&history_path);
         }
-        "remove" => {
-            history::remove_command(&history_path, args.get(2).unwrap());
-        }
-        _ => {
-            let failed_command = &args[1];
-            let history = read_history(&history_path);
-            if let Some(suggestion) = suggest_command(failed_command, &history) {
-                println!("{}", suggestion);
+        None => {
+            if !cli.failed_command.is_empty() {
+                let failed_command = cli.failed_command.join(" ");
+                let history = read_history(&history_path);
+                if let Some(suggestion) = suggest_command(&failed_command, &history) {
+                    println!("{}", suggestion);
+                } else {
+                    println!("No similar command found in history.");
+                    process::exit(1);
+                }
             } else {
-                process::exit(1);
+                Cli::command().print_help().unwrap();
+                println!();
             }
         }
     }
