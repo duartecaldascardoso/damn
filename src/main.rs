@@ -39,7 +39,26 @@ fn read_history(path: &str) -> Vec<String> {
         Err(_) => return Vec::new(),
     };
     let reader = BufReader::new(file);
-    reader.lines().filter_map(Result::ok).collect()
+
+    let system_commands = [
+        "clear",
+        "list",
+        "history",
+        "metrics",
+        "debug",
+        "add",
+        "remove",
+        "danger",
+    ];
+
+    reader
+        .lines()
+        .filter_map(Result::ok)
+        .filter(|line| {
+            let trimmed = line.trim();
+            !system_commands.iter().any(|sys| trimmed == *sys || trimmed.starts_with(&format!("{} ", sys)))
+        })
+        .collect()
 }
 
 fn main() {

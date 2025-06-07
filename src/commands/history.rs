@@ -3,6 +3,7 @@ use std::process;
 
 pub fn list_history(path: &str) {
     let history = read_history(&path);
+    
     if history.is_empty() {
         println!("Command history is empty.");
     } else {

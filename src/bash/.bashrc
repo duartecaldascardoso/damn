@@ -1,10 +1,11 @@
 damn() {
     if [ "$#" -eq 0 ]; then
         local last_cmd=""
-        # Look back through the last 20 commands for the first non-damn command
-        for i in {2..20}; do
-            last_cmd=$(history $i | head -n1 | sed 's/^[ ]*[0-9]\+[ ]*//')
-            if [ -n "$last_cmd" ] && [[ "$last_cmd" != damn* ]]; then
+        # Use command substitution to avoid subshell
+        for line in $(history 20 | tail -r); do
+            cmd=$(echo "$line" | sed 's/^[ ]*[0-9]\+[ ]*//')
+            if [ -n "$cmd" ] && [[ "$cmd" != damn* ]]; then
+                last_cmd="$cmd"
                 break
             fi
         done
@@ -15,7 +16,7 @@ damn() {
         fi
 
         local suggestion
-        suggestion=$(damn-bin suggest "$last_cmd")
+        suggestion=$(damn-bin suggest "$last_cmd" 2>&1)
         local ret=$?
 
         if [ $ret -eq 0 ] && [ -n "$suggestion" ]; then
@@ -30,14 +31,25 @@ damn() {
     fi
 }
 
-export PROMPT_COMMAND='
-  if [ $? -eq 0 ]; then
-    last_cmd=$(history 1 | sed "s/^[ ]*[0-9]\+[ ]*//")
+damn_log_command() {
+    # Only log interactive shell commands
+    [[ $- == *i* ]] || return
+
+    # $BASH_COMMAND is the command about to be executed
+    local last_cmd="$BASH_COMMAND"
+    # Remove leading/trailing spaces
+    last_cmd="${last_cmd#"${last_cmd%%[![:space:]]*}"}"
+    last_cmd="${last_cmd%"${last_cmd##*[![:space:]]}"}"
+
+    # Filter out damn and its subcommands
     if [ -n "$last_cmd" ] && \
        [[ "$last_cmd" != damn* ]] && \
        [[ "$last_cmd" != "clear" ]] && \
+       [[ "$last_cmd" != "list" ]] && \
        [[ "$last_cmd" != "history" ]]; then
-      echo "$last_cmd" >> ~/.damn_history
+        echo "$last_cmd" >> ~/.damn_history
     fi
-  fi
-'
+}
+
+# Set the DEBUG trap
+trap 'damn_log_command' DEBUG

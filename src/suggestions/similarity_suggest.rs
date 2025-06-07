@@ -1,12 +1,15 @@
 use strsim::levenshtein;
 
+// TODO maybe add a way for the user to define this 
+static SIMILARITY_THRESHOLD: f64 = 0.1;
+
 pub fn suggest_command<'a>(failed: &'a str, history: &'a [String]) -> Option<&'a String> {
     let mut best: Option<(&String, f64)> = None;
 
     for cmd in history {
         let sim = similarity(failed, cmd);
         eprintln!("Comparing: '{}' <-> '{}' : {:.4}", failed, cmd, sim);
-        if sim >= 0.5 {
+        if sim >= SIMILARITY_THRESHOLD {
             match best {
                 Some((_, best_sim)) if sim > best_sim => best = Some((cmd, sim)),
                 None => best = Some((cmd, sim)),
@@ -19,7 +22,7 @@ pub fn suggest_command<'a>(failed: &'a str, history: &'a [String]) -> Option<&'a
         eprintln!("Approved suggestion: '{}' (score: {:.4})", approved, score);
         Some(approved)
     } else {
-        eprintln!("No command in history reached the similarity threshold (0.95).");
+        eprintln!("No command in history reached the similarity threshold ({}) .", SIMILARITY_THRESHOLD);
         None
     }
 }
