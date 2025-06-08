@@ -1,25 +1,17 @@
 damn() {
-    if [ "$#" -eq 0 ]; then
-        local last_cmd=""
-        # Use command substitution to avoid subshell
-        for line in $(history 20 | tail -r); do
-            cmd=$(echo "$line" | sed 's/^[ ]*[0-9]\+[ ]*//')
-            if [ -n "$cmd" ] && [[ "$cmd" != damn* ]]; then
-                last_cmd="$cmd"
-                break
-            fi
-        done
-
-        if [ -z "$last_cmd" ]; then
+    if [[ $# -eq 0 ]]; then
+        local last_cmd
+        last_cmd=$(fc -ln -1)
+        last_cmd="${last_cmd##*( )}"
+        last_cmd="${last_cmd%%*( )}"
+        if [[ -z "$last_cmd" ]] || [[ "$last_cmd" == damn* ]]; then
             echo "damn: No previous command found to correct."
             return 1
         fi
-
         local suggestion
-        suggestion=$(damn-bin suggest "$last_cmd" 2>&1)
+        suggestion=$(damn-bin suggest "$last_cmd")
         local ret=$?
-
-        if [ $ret -eq 0 ] && [ -n "$suggestion" ]; then
+        if [[ $ret -eq 0 && -n "$suggestion" ]]; then
             echo "damn: Running -> $suggestion"
             eval "$suggestion"
         else
